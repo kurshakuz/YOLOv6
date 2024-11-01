@@ -152,7 +152,7 @@ class Trainer:
             write_tbimg(self.tblogger, self.vis_train_batch, self.step + self.max_stepnum * self.epoch, type='train')
 
         # forward
-        with amp.autocast(enabled=self.device != 'cpu'):
+        with torch.autocast("cuda", enabled=self.device != 'cpu'):
             _, _, batch_height, batch_width = images.shape
             # torch.cuda.synchronize()
             # qq2 = time.time()
