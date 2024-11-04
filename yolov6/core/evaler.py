@@ -157,7 +157,7 @@ class Evaler:
                 eval_outputs = copy.deepcopy([x.detach().cpu() for x in outputs])
 
             # save result
-            # pred_results.extend(self.convert_to_coco_format_seg(outputs, imgs, paths, shapes, self.ids, segments))
+            pred_results.extend(self.convert_to_coco_format_seg(outputs, imgs, paths, shapes, self.ids, segments))
 
             # for tensorboard visualization, maximum images to show: 8
             if i == 0:
