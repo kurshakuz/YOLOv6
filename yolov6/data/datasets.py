@@ -48,6 +48,20 @@ def img2label_paths(img_paths):
     sa, sb = f'{os.sep}images{os.sep}', f'{os.sep}labels{os.sep}'  # /images/, /labels/ substrings
     return [sb.join(x.rsplit(sa, 1)).rsplit('.', 1)[0] + '.txt' for x in img_paths]
 
+def convert_polygon_to_points_and_bbox(label_line):
+    """Convert 13-value polygon annotation to structured format
+    Args:
+        label_line: list of 13 values [class_id, x1,y1, x2,y2, x3,y3, x4,y4, min_x,min_y, max_x,max_y]
+    Returns:
+        Dictionary with points and bbox
+    """
+    values = np.array(label_line, dtype=np.float32)
+    return {
+        'class_id': int(values[0]),
+        'points': values[1:9].reshape(-1, 2),  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+        'bbox': values[9:]  # [min_x, min_y, max_x, max_y]
+    }
+
 class TrainValDataset(Dataset):
     '''YOLOv6 train_loader/val_loader, loads images and labels for training and validation.'''
     def __init__(
@@ -507,7 +521,7 @@ class TrainValDataset(Dataset):
                     labels = np.array(labels, dtype=np.float32)
                 if len(labels):
                     assert all(
-                        len(l) == 5 for l in labels
+                        len(l) == 13 for l in labels
                     ), f"{lb_path}: wrong label format."
                     assert (
                         labels >= 0
@@ -516,6 +530,19 @@ class TrainValDataset(Dataset):
                         labels[:, 1:] <= 1
                     ).all(), f"{lb_path}: Label values error: all coordinates must be normalized"
 
+                    # Process into standard YOLO format
+                    processed_labels = []
+                    for label in labels:
+                        polygon_data = convert_polygon_to_points_and_bbox(label)
+                        bbox = polygon_data['bbox']
+                        # Convert to YOLO format: [class_id, center_x, center_y, width, height]
+                        width = bbox[2] - bbox[0]
+                        height = bbox[3] - bbox[1]
+                        center_x = bbox[0] + width/2
+                        center_y = bbox[1] + height/2
+                        processed_labels.append([polygon_data['class_id'], center_x, center_y, width, height])
+                    
+                    labels = np.array(processed_labels)
                     _, indices = np.unique(labels, axis=0, return_index=True)
                     if len(indices) < len(labels):  # duplicate row check
                         labels = labels[indices]  # remove duplicates

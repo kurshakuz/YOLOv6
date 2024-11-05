@@ -748,26 +748,33 @@ class TrainValDataset(Dataset):
             )
             if labels:
                 for label in labels:
-                    c, x, y, w, h = label[:5]
-                    c, x, y, w, h = float(c), float(x), float(y), float(w), float(h)
-                    seg = np.asarray(label[5:]).astype(np.float32)
+                    # c, x, y, w, h = label[:5]
+                    # c, x, y, w, h = float(c), float(x), float(y), float(w), float(h)
+                    c = float(label[0])
+                    x_tl, y_tl, x_br, y_br = np.asarray(label[9:13]).astype(np.float32)
+                    x_tl = x_tl * img_w
+                    y_tl = y_tl * img_h
+                    x_br = x_br * img_w
+                    y_br = y_br * img_h
+
+                    seg = np.asarray(label[1:9]).astype(np.float32)
                     seg = seg.reshape(-1, 2)
                     #breakpoint()
                     seg = seg * np.asarray([img_w, img_h])
                     seg = seg.reshape(-1)
                     # convert x,y,w,h to x1,y1,x2,y2
-                    x1 = (x - w / 2) * img_w
-                    y1 = (y - h / 2) * img_h
-                    x2 = (x + w / 2) * img_w
-                    y2 = (y + h / 2) * img_h
+                    # x1 = (x - w / 2) * img_w
+                    # y1 = (y - h / 2) * img_h
+                    # x2 = (x + w / 2) * img_w
+                    # y2 = (y + h / 2) * img_h
                     # cls_id starts from 0
                     cls_id = int(c)
-                    w = max(0, x2 - x1)
-                    h = max(0, y2 - y1)
+                    w = max(0, x_br - x_tl)
+                    h = max(0, y_br - y_tl)
                     dataset["annotations"].append(
                         {
                             "area": h * w,
-                            "bbox": [x1, y1, w, h],
+                            "bbox": [x_tl, y_tl, w, h],
                             "category_id": cls_id,
                             "id": ann_id,
                             "image_id": img_id,

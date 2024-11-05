@@ -123,6 +123,7 @@ class Evaler:
                 confusion_matrix = ConfusionMatrix(nc=model.nc)
 
         for i, (imgs, targets, paths, shapes, masks) in enumerate(pbar):
+            pbar.set_description(f"GPU Memory: {torch.cuda.memory_allocated() / 1024 / 1024:.2f} MB")
             # pre-process
             t1 = time_sync()
             imgs = imgs.to(self.device, non_blocking=True)
@@ -216,6 +217,11 @@ class Evaler:
 
 
                 stats.append((correct_masks.cpu(), correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
+
+            del segments
+            del toutputs
+            del imgs, targets, masks
+            torch.cuda.empty_cache()
 
         if self.do_pr_metric:
             # Compute statistics
@@ -488,18 +494,19 @@ class Evaler:
             rle = encode(np.asarray(x[:, :, None], order='F', dtype='uint8'))[0]
             rle['counts'] = rle['counts'].decode('utf-8')
             return rle
-            
+        
         
         pred_results = []
         for i, pred in enumerate(outputs):
             if len(pred) == 0:
                 continue
+            # print_memory_usage()
             pred_masks = masks[i].cpu().numpy()
             pred_masks = np.transpose(pred_masks, (2, 0, 1))
             a = time.time()
-            with ThreadPool(64) as pool:
+            with ThreadPool(16) as pool:
                 rles = pool.map(single_encode, pred_masks)
-            print("rle time")
+            # print("rle time")
             b = time.time()
             path, shape = Path(paths[i]), shapes[i][0]
             self.scale_coords(imgs[i].shape[1:], pred[:, :4], shape, shapes[i][1])
@@ -521,7 +528,7 @@ class Evaler:
                 }
                 pred_results.append(pred_data)
             c = time.time()
-            print(b-a, c-b)
+            # print(b-a, c-b)
         return pred_results
 
     @staticmethod
@@ -728,4 +735,11 @@ class Evaler:
         else:
             masks_ori = None
         masks = crop_mask(masks, xyxy).gt_(0.5)
+
+        # Cleanup intermediate tensors
+        del seg
+        if masks_ori is not None:
+            del masks_ori
+        torch.cuda.empty_cache()
+
         return masks
