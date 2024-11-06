@@ -155,10 +155,10 @@ class TrainValDataset(Dataset):
                     np.array(labels[:, 11] > 0, dtype=np.int32) - 1)
                 boxes[:, 11] = np.array(labels[:, 12] > 0, dtype=np.int32) * (h * labels[:, 12] + pad[1]) + (
                     np.array(labels[:, 12] > 0, dtype=np.int32) - 1)
-                boxes[:, 12] = np.array(labels[:, 13] > 0, dtype=np.int32) * (w * labels[:, 13] + pad[0]) + (
-                    np.array(labels[:, 13] > 0, dtype=np.int32) - 1)
-                boxes[:, 13] = np.array(labels[:, 14] > 0, dtype=np.int32) * (h * labels[:, 14] + pad[1]) + (
-                    np.array(labels[:, 14] > 0, dtype=np.int32) - 1)
+                # boxes[:, 12] = np.array(labels[:, 13] > 0, dtype=np.int32) * (w * labels[:, 13] + pad[0]) + (
+                #     np.array(labels[:, 13] > 0, dtype=np.int32) - 1)
+                # boxes[:, 13] = np.array(labels[:, 14] > 0, dtype=np.int32) * (h * labels[:, 14] + pad[1]) + (
+                #     np.array(labels[:, 14] > 0, dtype=np.int32) - 1)
                 
 
                 labels[:, 1:] = boxes
@@ -187,15 +187,15 @@ class TrainValDataset(Dataset):
             boxes[:, 3] = (labels[:, 4] - labels[:, 2]) / h  # height
             labels[:, 1:] = boxes
 
-            labels[:, [5, 7, 9, 11, 13]] /= img.shape[1]  # normalized landmark x 0-1
-            labels[:, [5, 7, 9, 11, 13]] = np.where(labels[:, [5, 7, 9, 11, 13]] < 0, -1, labels[:, [5, 7, 9, 11, 13]])
-            labels[:, [6, 8, 10, 12, 14]] /= img.shape[0]  # normalized landmark y 0-1
-            labels[:, [6, 8, 10, 12, 14]] = np.where(labels[:, [6, 8, 10, 12, 14]] < 0, -1, labels[:, [6, 8, 10, 12, 14]])
-        #self.showlabels(img,labels[:,1:5],labels[:,5:15])
+            labels[:, [5, 7, 9, 11]] /= img.shape[1]  # normalized landmark x 0-1
+            labels[:, [5, 7, 9, 11]] = np.where(labels[:, [5, 7, 9, 11]] < 0, -1, labels[:, [5, 7, 9, 11]])
+            labels[:, [6, 8, 10, 12]] /= img.shape[0]  # normalized landmark y 0-1
+            labels[:, [6, 8, 10, 12]] = np.where(labels[:, [6, 8, 10, 12]] < 0, -1, labels[:, [6, 8, 10, 12]])
+        # self.showlabels(img,labels[:,1:5],labels[:,5:13])
         if self.augment:
             img, labels = self.general_augment(img, labels.copy())
 
-        labels_out = torch.zeros((len(labels), 16))
+        labels_out = torch.zeros((len(labels), 14))
         if len(labels):
             labels_out[:, 1:] = torch.from_numpy(labels)
 
@@ -413,7 +413,7 @@ class TrainValDataset(Dataset):
                         img_path,
                         np.array(info["labels"], dtype=np.float32)
                         if info["labels"]
-                        else np.zeros((0, 15), dtype=np.float32),
+                        else np.zeros((0, 13), dtype=np.float32),
                     )
                     for img_path, info in img_info.items()
                 ]
@@ -466,7 +466,6 @@ class TrainValDataset(Dataset):
                 labels[:, 8] = np.where(labels[:, 8] < 0, -1, 1 - labels[:, 8])
                 labels[:, 10] = np.where(labels[:, 10] < 0, -1, 1 - labels[:, 10])
                 labels[:, 12] = np.where(labels[:, 12] < 0, -1, 1 - labels[:, 12])
-                labels[:, 14] = np.where(labels[:, 14] < 0, -1, 1 - labels[:, 14])
 
 
         # Flip left-right
@@ -479,14 +478,20 @@ class TrainValDataset(Dataset):
                 labels[:, 7] = np.where(labels[:, 7] < 0, -1, 1 - labels[:, 7])
                 labels[:, 9] = np.where(labels[:, 9] < 0, -1, 1 - labels[:, 9])
                 labels[:, 11] = np.where(labels[:, 11] < 0, -1, 1 - labels[:, 11])
-                labels[:, 13] = np.where(labels[:, 13] < 0, -1, 1 - labels[:, 13])
 
-                eye_left = np.copy(labels[:, [5, 6]])
-                mouth_left = np.copy(labels[:, [11, 12]])
-                labels[:, [5, 6]] = labels[:, [7, 8]]
-                labels[:, [7, 8]] = eye_left
-                labels[:, [11, 12]] = labels[:, [13, 14]]
-                labels[:, [13, 14]] = mouth_left
+                # license plate keypoints
+                bottom_left = np.copy(labels[:, [5, 6]])
+                top_left = np.copy(labels[:, [7, 8]])
+                labels[:, [5, 6]] = labels[:, [11, 12]]
+                labels[:, [7, 8]] = labels[:, [9, 10]]
+                labels[:, [11, 12]] = bottom_left
+                labels[:, [9, 10]] = top_left
+                # eye_left = np.copy(labels[:, [5, 6]])
+                # mouth_left = np.copy(labels[:, [11, 12]])
+                # labels[:, [5, 6]] = labels[:, [7, 8]]
+                # labels[:, [7, 8]] = eye_left
+                # labels[:, [11, 12]] = labels[:, [13, 14]]
+                # labels[:, [13, 14]] = mouth_left
 
         return img, labels
 
@@ -569,7 +574,7 @@ class TrainValDataset(Dataset):
                     labels = np.array(labels, dtype=np.float32)
                 if len(labels):
                     assert all(
-                        len(l) == 15 for l in labels
+                        len(l) == 13 for l in labels
                     ), f"{lb_path}: wrong label format."
                     assert (
                         labels[:, : 5] >= 0

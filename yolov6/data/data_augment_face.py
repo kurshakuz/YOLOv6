@@ -80,6 +80,7 @@ def random_affine(img, labels=(), degrees=10, translate=.1, scale=.1, shear=10,
                   new_shape=(640, 640)):
     '''Applies Random affine transformation.'''
     n = len(labels)
+    # print("AAAAAAA", n, labels)
     height, width = new_shape
 
     M, s = get_transform_matrix(img.shape[:2], (height, width), degrees, scale, shear, translate)
@@ -90,23 +91,24 @@ def random_affine(img, labels=(), degrees=10, translate=.1, scale=.1, shear=10,
     if n:
         new = np.zeros((n, 4))
 
-        xy = np.ones((n * 9, 3))
-        xy[:, :2] = labels[:, [1, 2, 3, 4, 1, 4, 3, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]].reshape(n * 9, 2)  # x1y1, x2y2, x1y2, x2y1
+        xy = np.ones((n * 8, 3))
+        xy[:, :2] = labels[:, [1, 2, 3, 4, 1, 4, 3, 2, 5, 6, 7, 8, 9, 10, 11, 12]].reshape(n * 8, 2)  # x1y1, x2y2, x1y2, x2y1
         xy = xy @ M.T  # transform
-        xy = xy[:, :2].reshape(n, 18)  # perspective rescale or affine
+        xy = xy[:, :2].reshape(n, 16)  # perspective rescale or affine
 
         # create new boxes
         x = xy[:, [0, 2, 4, 6]]
         y = xy[:, [1, 3, 5, 7]]
 
-        landmarks = xy[:, [8, 9, 10, 11, 12, 13, 14, 15, 16, 17]]
+        landmarks = xy[:, [8, 9, 10, 11, 12, 13, 14, 15]]
+        # print("landmarks", landmarks)
         mask = np.array(labels[:, 5:] > 0, dtype=np.int32)
         landmarks = landmarks * mask
         landmarks = landmarks + mask - 1
 
         landmarks = np.where(landmarks < 0, -1, landmarks)
-        landmarks[:, [0, 2, 4, 6, 8]] = np.where(landmarks[:, [0, 2, 4, 6, 8]] > width, -1, landmarks[:, [0, 2, 4, 6, 8]])
-        landmarks[:, [1, 3, 5, 7, 9]] = np.where(landmarks[:, [1, 3, 5, 7, 9]] > height, -1,landmarks[:, [1, 3, 5, 7, 9]])
+        landmarks[:, [0, 2, 4, 6]] = np.where(landmarks[:, [0, 2, 4, 6]] > width, -1, landmarks[:, [0, 2, 4, 6]])
+        landmarks[:, [1, 3, 5, 7]] = np.where(landmarks[:, [1, 3, 5, 7]] > height, -1,landmarks[:, [1, 3, 5, 7]])
 
         landmarks[:, 0] = np.where(landmarks[:, 1] == -1, -1, landmarks[:, 0])
         landmarks[:, 1] = np.where(landmarks[:, 0] == -1, -1, landmarks[:, 1])
@@ -119,9 +121,6 @@ def random_affine(img, labels=(), degrees=10, translate=.1, scale=.1, shear=10,
 
         landmarks[:, 6] = np.where(landmarks[:, 7] == -1, -1, landmarks[:, 6])
         landmarks[:, 7] = np.where(landmarks[:, 6] == -1, -1, landmarks[:, 7])
-
-        landmarks[:, 8] = np.where(landmarks[:, 9] == -1, -1, landmarks[:, 8])
-        landmarks[:, 9] = np.where(landmarks[:, 8] == -1, -1, landmarks[:, 9])
 
         labels[:,5:] = landmarks
 
@@ -216,8 +215,6 @@ def mosaic_augmentation(img_size, imgs, hs, ws, labels, hyp):
             boxes[:, 9] = np.array(labels_per_img[:, 10] > 0, dtype=np.int32) * (h * labels_per_img[:, 10] + padh) + (np.array(labels_per_img[:, 10] > 0, dtype=np.int32) - 1)
             boxes[:, 10] = np.array(labels_per_img[:, 11] > 0, dtype=np.int32) * (w * labels_per_img[:, 11] + padw) + (np.array(labels_per_img[:, 11] > 0, dtype=np.int32) - 1)
             boxes[:, 11] = np.array(labels_per_img[:, 12] > 0, dtype=np.int32) * (h * labels_per_img[:, 12] + padh) + (np.array(labels_per_img[:, 12] > 0, dtype=np.int32) - 1)
-            boxes[:, 12] = np.array(labels_per_img[:, 13] > 0, dtype=np.int32) * (w * labels_per_img[:, 13] + padw) + (np.array(labels_per_img[:, 13] > 0, dtype=np.int32) - 1)
-            boxes[:, 13] = np.array(labels_per_img[:, 14] > 0, dtype=np.int32) * (h * labels_per_img[:, 14] + padh) + (np.array(labels_per_img[:, 14] > 0, dtype=np.int32) - 1)
             #labels4.append(labels)
             labels_per_img[:, 1:] = boxes
 
@@ -243,9 +240,6 @@ def mosaic_augmentation(img_size, imgs, hs, ws, labels, hyp):
 
         labels4[:, 11] = np.where(labels4[:, 12] == -1, -1, labels4[:, 11])
         labels4[:, 12] = np.where(labels4[:, 11] == -1, -1, labels4[:, 12])
-
-        labels4[:, 13] = np.where(labels4[:, 14] == -1, -1, labels4[:, 13])
-        labels4[:, 14] = np.where(labels4[:, 13] == -1, -1, labels4[:, 14])
 
     # Augment
     img4, labels4 = random_affine(img4, labels4,

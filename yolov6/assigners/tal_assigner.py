@@ -36,7 +36,7 @@ class TaskAlignedAssigner(nn.Module):
             anc_points (Tensor): shape(num_total_anchors, 2)
             gt_labels (Tensor): shape(bs, n_max_boxes, 1)
             gt_bboxes (Tensor): shape(bs, n_max_boxes, 4)
-            gt_ldmks (Tensor): shape(bs, n_max_boxes, 10)
+            gt_ldmks (Tensor): shape(bs, n_max_boxes, 8)
             mask_gt (Tensor): shape(bs, n_max_boxes, 1)
         Returns:
             target_labels (Tensor): shape(bs, num_total_anchors)
@@ -51,7 +51,7 @@ class TaskAlignedAssigner(nn.Module):
             device = gt_bboxes.device
             return torch.full_like(pd_scores[..., 0], self.bg_idx).to(device), \
                    torch.zeros_like(pd_bboxes).to(device), \
-                   torch.zeros(pd_bboxes.shape[0], pd_bboxes.shape[1], 10).to(device), \
+                   torch.zeros(pd_bboxes.shape[0], pd_bboxes.shape[1], 8).to(device), \
                    torch.zeros_like(pd_scores).to(device), \
                    torch.zeros_like(pd_scores[..., 0]).bool().to(device)
 
@@ -169,7 +169,7 @@ class TaskAlignedAssigner(nn.Module):
 
         # assigned target boxes
         target_bboxes = gt_bboxes.reshape([-1, 4])[target_gt_idx]
-        target_ldmks = gt_ldmks.reshape([-1, 10])[target_gt_idx]
+        target_ldmks = gt_ldmks.reshape([-1, 8])[target_gt_idx]
 
         # assigned target scores
         target_labels[target_labels<0] = 0

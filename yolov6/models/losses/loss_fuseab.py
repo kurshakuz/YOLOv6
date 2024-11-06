@@ -164,7 +164,7 @@ class ComputeLoss:
                          (self.loss_weight['landmark'] * loss_landmark).unsqueeze(0))).detach()
 
     def preprocess(self, targets, batch_size, scale_tensor):
-        targets_list = np.zeros((batch_size, 1, 15)).tolist()
+        targets_list = np.zeros((batch_size, 1, 13)).tolist()
         for i, item in enumerate(targets.cpu().numpy().tolist()):
             targets_list[int(item[0])].append(item[1:])
         max_len = max((len(l) for l in targets_list))
@@ -172,7 +172,7 @@ class ComputeLoss:
         batch_target = targets[:, :, 1:5].mul_(scale_tensor)
         targets[..., 1:5] = xywh2xyxy(batch_target)
         # add landmarks
-        gt_ldmks = targets[:, :, 5:15].mul_(scale_tensor[0,0])
+        gt_ldmks = targets[:, :, 5:13].mul_(scale_tensor[0,0])
         return targets, gt_ldmks
 
     def bbox_decode(self, anchor_points, pred_dist):

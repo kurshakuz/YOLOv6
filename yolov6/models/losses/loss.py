@@ -166,28 +166,28 @@ class ComputeLoss:
                          (self.loss_weight['landmark'] * loss_landmark).unsqueeze(0))).detach()
      
     def preprocess(self, targets, batch_size, scale_tensor):
-        targets_list = np.zeros((batch_size, 1, 15)).tolist()
+        targets_list = np.zeros((batch_size, 1, 13)).tolist()
         for i, item in enumerate(targets.cpu().numpy().tolist()):
             targets_list[int(item[0])].append(item[1:])
         max_len = max((len(l) for l in targets_list))
-        targets = torch.from_numpy(np.array(list(map(lambda l:l + [[-1,0,0,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]]*(max_len - len(l)), targets_list)))[:,1:,:]).to(targets.device)
+        targets = torch.from_numpy(np.array(list(map(lambda l:l + [[-1,0,0,0,0,-1,-1,-1,-1,-1,-1,-1,-1]]*(max_len - len(l)), targets_list)))[:,1:,:]).to(targets.device)
         
         batch_target = targets[:, :, 1:5].mul_(scale_tensor)
         targets[..., 1:5] = xywh2xyxy(batch_target)
 
         # landmarks
-        gt_ldmks = targets[:, :, 5:15].mul_(scale_tensor[0,0])
+        gt_ldmks = targets[:, :, 5:13].mul_(scale_tensor[0,0])
         return targets, gt_ldmks
 
     def bbox_decode(self, anchor_points, pred_dist):
-        pred_distri = pred_dist.clone()[..., :-10]
-        pred_ldmks = pred_dist.clone()[..., -10:]
+        pred_distri = pred_dist.clone()[..., :-8]
+        pred_ldmks = pred_dist.clone()[..., -8:]
         if self.use_dfl:
             batch_size, n_anchors, _ = pred_distri.shape
             pred_distri = F.softmax(pred_distri.view(batch_size, n_anchors, 4, self.reg_max + 1), dim=-1).matmul(self.proj.to(pred_distri.device))
         
-        pred_ldmks[..., 0:9:2] += torch.unsqueeze(anchor_points[..., 0:1], 0).repeat(pred_dist.shape[0],1,5)
-        pred_ldmks[..., 1:10:2] += torch.unsqueeze(anchor_points[..., 1:2], 0).repeat(pred_dist.shape[0],1,5)
+        pred_ldmks[..., 0:7:2] += torch.unsqueeze(anchor_points[..., 0:1], 0).repeat(pred_dist.shape[0],1,4)
+        pred_ldmks[..., 1:8:2] += torch.unsqueeze(anchor_points[..., 1:2], 0).repeat(pred_dist.shape[0],1,4)
         return dist2bbox(pred_distri, anchor_points), pred_ldmks
 
 
@@ -238,7 +238,7 @@ class BboxLoss(nn.Module):
                 dist_mask = fg_mask.unsqueeze(-1).repeat(
                     [1, 1, (self.reg_max + 1) * 4])
                 pred_dist_pos = torch.masked_select(
-                    pred_dist.clone()[..., :-10], dist_mask).reshape([-1, 4, self.reg_max + 1])
+                    pred_dist.clone()[..., :-8], dist_mask).reshape([-1, 4, self.reg_max + 1])
                 target_ltrb = bbox2dist(anchor_points, target_bboxes, self.reg_max)
                 target_ltrb_pos = torch.masked_select(
                     target_ltrb, bbox_mask).reshape([-1, 4])
@@ -295,9 +295,9 @@ class LandmarksLoss(nn.Module):
         self.alpha = alpha
 
     def forward(self, pred_ldmks, gt_ldmks, mask):
-        mask = mask.unsqueeze(-1).repeat([1, 1, 10])
-        pred_ldmks_pos = torch.masked_select(pred_ldmks, mask).reshape([-1, 10])
-        gt_ldmks_pos = torch.masked_select(gt_ldmks, mask).reshape([-1, 10])
+        mask = mask.unsqueeze(-1).repeat([1, 1, 8])
+        pred_ldmks_pos = torch.masked_select(pred_ldmks, mask).reshape([-1, 8])
+        gt_ldmks_pos = torch.masked_select(gt_ldmks, mask).reshape([-1, 8])
 
         lmdk_mask = torch.where(gt_ldmks_pos < 0, torch.full_like(gt_ldmks_pos, 0.), torch.full_like(gt_ldmks_pos, 1.0))
         loss = self.loss_fcn(pred_ldmks_pos*lmdk_mask, gt_ldmks_pos*lmdk_mask)

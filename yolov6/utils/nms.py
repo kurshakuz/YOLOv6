@@ -109,7 +109,7 @@ def non_max_suppression_face(prediction, conf_thres=0.25, iou_thres=0.45, classe
     """Runs Non-Maximum Suppression (NMS) on inference results.
     This code is borrowed from: https://github.com/ultralytics/yolov5/blob/47233e1698b89fc437a4fb9463c815e9171be955/utils/general.py#L775
     Args:
-        prediction: (tensor), with shape [N, 15 + num_classes], N is the number of bboxes.
+        prediction: (tensor), with shape [N, 13 + num_classes], N is the number of bboxes.
         conf_thres: (float) confidence threshold.
         iou_thres: (float) iou threshold.
         classes: (None or list[int]), if a list is provided, nms only keep the classes you provide.
@@ -117,11 +117,11 @@ def non_max_suppression_face(prediction, conf_thres=0.25, iou_thres=0.45, classe
         multi_label: (bool), when it is set to True, one box can have multi labels, otherwise, one box only huave one label.
         max_det:(int), max number of output bboxes.
     Returns:
-         list of detections, echo item is one tensor with shape (num_boxes, 16), 16 is for [xyxy, ldmks, conf, cls].
+         list of detections, echo item is one tensor with shape (num_boxes, 14), 14 is for [xyxy, ldmks, conf, cls].
     """
 
-    num_classes = prediction.shape[2] - 15  # number of classes
-    pred_candidates = torch.logical_and(prediction[..., 14] > conf_thres, torch.max(prediction[..., 15:], axis=-1)[0] > conf_thres)  # candidates
+    num_classes = prediction.shape[2] - 13  # number of classes
+    pred_candidates = torch.logical_and(prediction[..., 14] > conf_thres, torch.max(prediction[..., 13:], axis=-1)[0] > conf_thres)  # candidates
     # Check the parameters.
     assert 0 <= conf_thres <= 1, f'conf_thresh must be in 0.0 to 1.0, however {conf_thres} is provided.'
     assert 0 <= iou_thres <= 1, f'iou_thres must be in 0.0 to 1.0, however {iou_thres} is provided.'
@@ -133,7 +133,7 @@ def non_max_suppression_face(prediction, conf_thres=0.25, iou_thres=0.45, classe
     multi_label &= num_classes > 1  # multiple labels per box
 
     tik = time.time()
-    output = [torch.zeros((0, 16), device=prediction.device)] * prediction.shape[0]
+    output = [torch.zeros((0, 14), device=prediction.device)] * prediction.shape[0]
     for img_idx, x in enumerate(prediction):  # image index, image inference
         x = x[pred_candidates[img_idx]]  # confidence
 
@@ -142,17 +142,17 @@ def non_max_suppression_face(prediction, conf_thres=0.25, iou_thres=0.45, classe
             continue
 
         # confidence multiply the objectness
-        x[:, 15:] *= x[:, 14:15]  # conf = obj_conf * cls_conf
+        x[:, 13:] *= x[:, 12:13]  # conf = obj_conf * cls_conf
 
         # (center x, center y, width, height) to (x1, y1, x2, y2)
         box = xywh2xyxy(x[:, :4])
 
-        # Detections matrix's shape is  (n,16), each row represents (xyxy, conf, cls, lmdks)
+        # Detections matrix's shape is  (n,14), each row represents (xyxy, conf, cls, lmdks)
         if multi_label:
-            box_idx, class_idx = (x[:, 15:] > conf_thres).nonzero(as_tuple=False).T
-            x = torch.cat((box[box_idx], x[box_idx, class_idx + 15, None], class_idx[:, None].float(), x[box_idx, 4:14]), 1)
+            box_idx, class_idx = (x[:, 13:] > conf_thres).nonzero(as_tuple=False).T
+            x = torch.cat((box[box_idx], x[box_idx, class_idx + 13, None], class_idx[:, None].float(), x[box_idx, 4:14]), 1)
         else:  # Only keep the class with highest scores.
-            conf, class_idx = x[:, 15:].max(1, keepdim=True)
+            conf, class_idx = x[:, 13:].max(1, keepdim=True)
             x = torch.cat((box, conf, class_idx.float(), x[:, 4:14]), 1)[conf.view(-1) > conf_thres]
 
         # Filter by class, only keep boxes whose category is in classes.

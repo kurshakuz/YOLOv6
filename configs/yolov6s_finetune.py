@@ -1,7 +1,7 @@
 # YOLOv6s-face model
 model = dict(
     type='YOLOv6s',
-    pretrained='weights/yolov6s_coco.pt',
+    pretrained='weights/yolov6s_1.pt',
     depth_multiple=0.70,  
     width_multiple=0.50,
     backbone=dict(
