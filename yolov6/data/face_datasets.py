@@ -155,11 +155,6 @@ class TrainValDataset(Dataset):
                     np.array(labels[:, 11] > 0, dtype=np.int32) - 1)
                 boxes[:, 11] = np.array(labels[:, 12] > 0, dtype=np.int32) * (h * labels[:, 12] + pad[1]) + (
                     np.array(labels[:, 12] > 0, dtype=np.int32) - 1)
-                # boxes[:, 12] = np.array(labels[:, 13] > 0, dtype=np.int32) * (w * labels[:, 13] + pad[0]) + (
-                #     np.array(labels[:, 13] > 0, dtype=np.int32) - 1)
-                # boxes[:, 13] = np.array(labels[:, 14] > 0, dtype=np.int32) * (h * labels[:, 14] + pad[1]) + (
-                #     np.array(labels[:, 14] > 0, dtype=np.int32) - 1)
-                
 
                 labels[:, 1:] = boxes
 
@@ -187,11 +182,12 @@ class TrainValDataset(Dataset):
             boxes[:, 3] = (labels[:, 4] - labels[:, 2]) / h  # height
             labels[:, 1:] = boxes
 
-            labels[:, [5, 7, 9, 11]] /= img.shape[1]  # normalized landmark x 0-1
+            labels[:, [5, 7, 9, 11]] /= w  # normalized landmark x 0-1
             labels[:, [5, 7, 9, 11]] = np.where(labels[:, [5, 7, 9, 11]] < 0, -1, labels[:, [5, 7, 9, 11]])
-            labels[:, [6, 8, 10, 12]] /= img.shape[0]  # normalized landmark y 0-1
+            labels[:, [6, 8, 10, 12]] /= h  # normalized landmark y 0-1
             labels[:, [6, 8, 10, 12]] = np.where(labels[:, [6, 8, 10, 12]] < 0, -1, labels[:, [6, 8, 10, 12]])
-        # self.showlabels(img,labels[:,1:5],labels[:,5:13])
+
+        self.showlabels(img,labels[:,1:5],labels[:,5:13])
         if self.augment:
             img, labels = self.general_augment(img, labels.copy())
 
@@ -209,16 +205,16 @@ class TrainValDataset(Dataset):
     def showlabels(self, img, boxs, landmarks):
         b, g, r = cv2.split(img)
         #print(boxs)
-        new_image1 = cv2.merge([r, g, b])
+        new_image1 = cv2.merge([b, g, r])
         for box in boxs:
             x,y,w,h = box[0] * img.shape[1], box[1] * img.shape[0], box[2] * img.shape[1], box[3] * img.shape[0]
-            #cv2.rectangle(image, (x,y), (x+w,y+h), (0,255,0), 2)
+            # cv2.rectangle(new_image1, (int(x), int(y)), (int(w), int(h)), (0,255,0), 2)
             
             cv2.rectangle(new_image1, (int(x - w/2), int(y - h/2)), (int(x + w/2), int(y + h/2)), (0, 255, 0), 2)
 
         for landmark in landmarks:
             #cv2.circle(img,(60,60),30,(0,0,255))
-            for i in range(5):
+            for i in range(4):
                 cv2.circle(new_image1, (int(landmark[2*i] * img.shape[1]), int(landmark[2*i+1]*img.shape[0])), 3 ,(0,0,255), -1)
         cv2.imwrite('1.jpg', new_image1)
         cv2.waitKey(0)
