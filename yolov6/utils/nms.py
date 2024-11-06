@@ -121,7 +121,7 @@ def non_max_suppression_face(prediction, conf_thres=0.25, iou_thres=0.45, classe
     """
 
     num_classes = prediction.shape[2] - 13  # number of classes
-    pred_candidates = torch.logical_and(prediction[..., 14] > conf_thres, torch.max(prediction[..., 13:], axis=-1)[0] > conf_thres)  # candidates
+    pred_candidates = torch.logical_and(prediction[..., 12] > conf_thres, torch.max(prediction[..., 13:], axis=-1)[0] > conf_thres)  # candidates
     # Check the parameters.
     assert 0 <= conf_thres <= 1, f'conf_thresh must be in 0.0 to 1.0, however {conf_thres} is provided.'
     assert 0 <= iou_thres <= 1, f'iou_thres must be in 0.0 to 1.0, however {iou_thres} is provided.'
@@ -153,7 +153,7 @@ def non_max_suppression_face(prediction, conf_thres=0.25, iou_thres=0.45, classe
             x = torch.cat((box[box_idx], x[box_idx, class_idx + 13, None], class_idx[:, None].float(), x[box_idx, 4:14]), 1)
         else:  # Only keep the class with highest scores.
             conf, class_idx = x[:, 13:].max(1, keepdim=True)
-            x = torch.cat((box, conf, class_idx.float(), x[:, 4:14]), 1)[conf.view(-1) > conf_thres]
+            x = torch.cat((box, conf, class_idx.float(), x[:, 4:12]), 1)[conf.view(-1) > conf_thres]
 
         # Filter by class, only keep boxes whose category is in classes.
         if classes is not None:
