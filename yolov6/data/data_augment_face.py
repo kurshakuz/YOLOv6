@@ -80,7 +80,6 @@ def random_affine(img, labels=(), degrees=10, translate=.1, scale=.1, shear=10,
                   new_shape=(640, 640)):
     '''Applies Random affine transformation.'''
     n = len(labels)
-    # print("AAAAAAA", n, labels)
     height, width = new_shape
 
     M, s = get_transform_matrix(img.shape[:2], (height, width), degrees, scale, shear, translate)
