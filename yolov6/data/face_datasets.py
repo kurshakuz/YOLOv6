@@ -482,12 +482,6 @@ class TrainValDataset(Dataset):
                 labels[:, [7, 8]] = labels[:, [9, 10]]
                 labels[:, [11, 12]] = bottom_left
                 labels[:, [9, 10]] = top_left
-                # eye_left = np.copy(labels[:, [5, 6]])
-                # mouth_left = np.copy(labels[:, [11, 12]])
-                # labels[:, [5, 6]] = labels[:, [7, 8]]
-                # labels[:, [7, 8]] = eye_left
-                # labels[:, [11, 12]] = labels[:, [13, 14]]
-                # labels[:, [13, 14]] = mouth_left
 
         return img, labels
 

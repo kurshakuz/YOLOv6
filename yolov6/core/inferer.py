@@ -273,9 +273,9 @@ class Inferer:
         # Add one xyxy box to image with label
         p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
         cv2.rectangle(image, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
-        colors = [(255,0,0),(0,255,0),(0,0,255),(255,255,0),(0,255,255)]
+        colors = [(255,0,0),(0,255,0),(255,255,0),(0,255,255)]
         for i in range(4):
-            cv2.circle(image, (int(landmarks[2*i]), int(landmarks[2*i+1])), lw+1, colors[i], -1)
+            cv2.circle(image, (int(landmarks[2*i]), int(landmarks[2*i+1])), lw+5, colors[i], -1)
         if label:
             tf = max(lw - 1, 1)  # font thickness
             w, h = cv2.getTextSize(label, 0, fontScale=lw / 3, thickness=tf)[0]  # text width, height

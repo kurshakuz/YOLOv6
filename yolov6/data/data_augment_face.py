@@ -101,7 +101,7 @@ def random_affine(img, labels=(), degrees=10, translate=.1, scale=.1, shear=10,
         y = xy[:, [1, 3, 5, 7]]
 
         landmarks = xy[:, [8, 9, 10, 11, 12, 13, 14, 15]]
-        # print("landmarks", landmarks)
+
         mask = np.array(labels[:, 5:] > 0, dtype=np.int32)
         landmarks = landmarks * mask
         landmarks = landmarks + mask - 1
