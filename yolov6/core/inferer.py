@@ -17,7 +17,7 @@ from yolov6.utils.events import LOGGER, load_yaml
 from yolov6.layers.common import DetectBackend
 from yolov6.data.data_augment import letterbox
 from yolov6.data.datasets import LoadData
-from yolov6.utils.nms import non_max_suppression_face
+from yolov6.utils.nms import non_max_suppression_face, non_max_suppression
 from yolov6.utils.torch_utils import get_model_info
 
 class Inferer:
@@ -76,8 +76,9 @@ class Inferer:
                 img = img[None]
                 # expand for batch dim
             t1 = time.time()
-            pred_results = self.model(img)
-            det = non_max_suppression_face(pred_results, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
+            (pred_results_lp, pred_results_det) = self.model(img)
+            det_lp = non_max_suppression_face(pred_results_lp, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
+            det_det = non_max_suppression(pred_results_det, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
             t2 = time.time()
 
             if self.webcam:
@@ -98,18 +99,18 @@ class Inferer:
             assert img_ori.data.contiguous, 'Image needs to be contiguous. Please apply to input images with np.ascontiguousarray(im).'
             self.font_check()
 
-            if len(det):
-                det[:, :4], det[:, -8:] = self.rescale(img.shape[2:], det[:, :4], det[:, -8:], img_src.shape)
+            if len(det_lp):
+                det_lp[:, :4], det_lp[:, -8:] = self.rescale_lp(img.shape[2:], det_lp[:, :4], det_lp[:, -8:], img_src.shape)
             if save_txt_widerface:
                 with open(txt_path + '.txt', 'w') as f:
                     file_name = os.path.basename(img_path)[:-4] + "\n"
-                    bboxs_num = str(len(det)) + "\n"
+                    bboxs_num = str(len(det_lp)) + "\n"
                     f.write(file_name)
                     f.write(bboxs_num)
-                    for ix, detection in enumerate(det):
+                    for ix, detection in enumerate(det_lp):
                         xyxy, conf, cls, lmdks = detection[:4], detection[4], detection[5], detection[6:]
                         #xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / 1.0).view(-1).tolist()  # xywh
-                        xywh = (self.box_convert((xyxy).clone().detach().view(1, 4)) / 1.0).view(-1).tolist()  # xywh
+                        xywh = (self.box_convert_lp((xyxy).clone().detach().view(1, 4)) / 1.0).view(-1).tolist()  # xywh
                         x1 = int(xywh[0] - 0.5 * xywh[2])
                         y1 = int(xywh[1] - 0.5 * xywh[3])
                         x2 = int(xywh[0] + 0.5 * xywh[2])
@@ -117,8 +118,8 @@ class Inferer:
                         line = (x1, y1, x2-x1, y2-y1, min(conf,1))
                         f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
-            if len(det):
-                for detection in reversed(det):
+            if len(det_lp):
+                for detection in reversed(det_lp):
                     xyxy, conf, cls, lmdks = detection[:4], detection[4], detection[5], detection[6:]
                     if save_txt:  # Write to file
                         xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -130,7 +131,24 @@ class Inferer:
                         class_num = int(cls)  # integer class
                         label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f}')
 
-                        self.plot_box_and_label(img_ori, min(round(sum(img_ori.shape) / 2 * 0.003), 1), xyxy, lmdks, label, color=self.generate_colors(class_num, True))
+                        self.plot_box_and_label_lp(img_ori, min(round(sum(img_ori.shape) / 2 * 0.003), 1), xyxy, lmdks, label, color=self.generate_colors(class_num, True))
+
+                img_src = np.asarray(img_ori)
+
+            if len(det_det):
+                det_det[:, :4] = self.rescale_det(img.shape[2:], det_det[:, :4], img_src.shape).round()
+                for *xyxy, conf, cls in reversed(det_det):
+                    if save_txt:  # Write to file
+                        xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                        line = (cls, *xywh, conf)
+                        with open(txt_path + '.txt', 'a') as f:
+                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
+
+                    if save_img:
+                        class_num = int(cls)  # integer class
+                        label = None if hide_labels else (self.class_names[class_num] if hide_conf else f'{self.class_names[class_num]} {conf:.2f}')
+
+                        self.plot_box_and_label_det(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(class_num, True))
 
                 img_src = np.asarray(img_ori)
 
@@ -189,7 +207,7 @@ class Inferer:
         return image, img_src
 
     @staticmethod
-    def rescale(ori_shape, boxes, lmdks, target_shape):
+    def rescale_lp(ori_shape, boxes, lmdks, target_shape):
         '''Rescale the output to the original image shape'''
         ratio = min(ori_shape[0] / target_shape[0], ori_shape[1] / target_shape[1])
         padding = (ori_shape[1] - target_shape[1] * ratio) / 2, (ori_shape[0] - target_shape[0] * ratio) / 2
@@ -218,6 +236,23 @@ class Inferer:
         lmdks[:, 7].clamp_(0, target_shape[0])
 
         return boxes.round(), lmdks.round()
+    
+    @staticmethod
+    def rescale_det(ori_shape, boxes, target_shape):
+        '''Rescale the output to the original image shape'''
+        ratio = min(ori_shape[0] / target_shape[0], ori_shape[1] / target_shape[1])
+        padding = (ori_shape[1] - target_shape[1] * ratio) / 2, (ori_shape[0] - target_shape[0] * ratio) / 2
+
+        boxes[:, [0, 2]] -= padding[0]
+        boxes[:, [1, 3]] -= padding[1]
+        boxes[:, :4] /= ratio
+
+        boxes[:, 0].clamp_(0, target_shape[1])  # x1
+        boxes[:, 1].clamp_(0, target_shape[0])  # y1
+        boxes[:, 2].clamp_(0, target_shape[1])  # x2
+        boxes[:, 3].clamp_(0, target_shape[0])  # y2
+
+        return boxes
 
     def check_img_size(self, img_size, s=32, floor=0):
         """Make sure image size is a multiple of stride s in each dimension, and return a new shape list of image."""
@@ -269,13 +304,27 @@ class Inferer:
         return text_size
 
     @staticmethod
-    def plot_box_and_label(image, lw, box, landmarks, label='', color=(128, 128, 128), txt_color=(255, 255, 255), font=cv2.FONT_HERSHEY_COMPLEX):
+    def plot_box_and_label_lp(image, lw, box, landmarks, label='', color=(128, 128, 128), txt_color=(255, 255, 255), font=cv2.FONT_HERSHEY_COMPLEX):
         # Add one xyxy box to image with label
         p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
         cv2.rectangle(image, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
         colors = [(255,0,0),(0,255,0),(255,255,0),(0,255,255)]
         for i in range(4):
             cv2.circle(image, (int(landmarks[2*i]), int(landmarks[2*i+1])), lw+5, colors[i], -1)
+        if label:
+            tf = max(lw - 1, 1)  # font thickness
+            w, h = cv2.getTextSize(label, 0, fontScale=lw / 3, thickness=tf)[0]  # text width, height
+            outside = p1[1] - h - 3 >= 0  # label fits outside box
+            p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
+            cv2.rectangle(image, p1, p2, color, -1, cv2.LINE_AA)  # filled
+            cv2.putText(image, label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2), font, lw / 3, txt_color,
+                        thickness=tf, lineType=cv2.LINE_AA)
+
+    @staticmethod
+    def plot_box_and_label_det(image, lw, box, label='', color=(128, 128, 128), txt_color=(255, 255, 255), font=cv2.FONT_HERSHEY_COMPLEX):
+        # Add one xyxy box to image with label
+        p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
+        cv2.rectangle(image, p1, p2, color, thickness=lw, lineType=cv2.LINE_AA)
         if label:
             tf = max(lw - 1, 1)  # font thickness
             w, h = cv2.getTextSize(label, 0, fontScale=lw / 3, thickness=tf)[0]  # text width, height

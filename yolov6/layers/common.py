@@ -555,10 +555,12 @@ class DetectBackend(nn.Module):
         self.__dict__.update(locals())  # assign all variables to self
 
     def forward(self, im, val=False):
-        y, _ = self.model(im)
-        if isinstance(y, np.ndarray):
-            y = torch.tensor(y, device=self.device)
-        return y
+        (y_lp, y_det), _ = self.model(im)
+        if isinstance(y_lp, np.ndarray):
+            y_lp = torch.tensor(y_lp, device=self.device)
+        if isinstance(y_det, np.ndarray):
+            y_det = torch.tensor(y_det, device=self.device)
+        return (y_lp, y_det)
 
 
 class RepBlock(nn.Module):

@@ -13,7 +13,7 @@ from pycocotools.cocoeval import COCOeval
 
 from yolov6.data.data_load import create_dataloader
 from yolov6.utils.events import LOGGER, NCOLS
-from yolov6.utils.nms import non_max_suppression_face
+from yolov6.utils.nms import non_max_suppression_face, non_max_suppression
 from yolov6.utils.general import download_ckpt
 from yolov6.utils.checkpoint import load_checkpoint
 from yolov6.utils.torch_utils import time_sync, get_model_info
@@ -131,26 +131,31 @@ class Evaler:
 
             # Inference
             t2 = time_sync()
-            outputs, _ = model(imgs)
+            (outputs_lp, outputs_det), _ = model(imgs)
             self.speed_result[2] += time_sync() - t2  # inference time
 
             # post-process
             t3 = time_sync()
-            outputs = non_max_suppression_face(outputs, self.conf_thres, self.iou_thres, multi_label=True)
+            outputs_lp = non_max_suppression_face(outputs_lp, self.conf_thres, self.iou_thres, multi_label=True)
+            outputs_det = non_max_suppression(outputs_det, self.conf_thres, self.iou_thres, multi_label=True)
             self.speed_result[3] += time_sync() - t3  # post-process time
-            self.speed_result[0] += len(outputs)
+            self.speed_result[0] += len(outputs_lp)
+            self.speed_result[0] += len(outputs_det)
 
             if self.do_pr_metric:
                 import copy
-                eval_outputs = copy.deepcopy([x.detach().cpu() for x in outputs])
+                eval_outputs_lp = copy.deepcopy([x.detach().cpu() for x in outputs_lp])
+                eval_outputs_det = copy.deepcopy([x.detach().cpu() for x in outputs_det])
 
             # save result
-            pred_results.extend(self.convert_to_coco_format(outputs, imgs, paths, shapes, self.ids))
+            pred_results.extend(self.convert_to_coco_format(outputs_lp, imgs, paths, shapes, self.ids))
+            pred_results.extend(self.convert_to_coco_format(outputs_det, imgs, paths, shapes, self.ids))
 
             # for tensorboard visualization, maximum images to show: 8
             if i == 0:
                 vis_num = min(len(imgs), 8)
-                vis_outputs = outputs[:vis_num]
+                vis_outputs = outputs_lp[:vis_num]
+                vis_outputs = outputs_det[:vis_num]
                 vis_paths = paths[:vis_num]
 
             if not self.do_pr_metric:
@@ -159,7 +164,7 @@ class Evaler:
             # Statistics per image
             # This code is based on
             # https://github.com/ultralytics/yolov5/blob/master/val.py
-            for si, pred in enumerate(eval_outputs):
+            for si, pred in enumerate(zip(eval_outputs_lp, eval_outputs_det)):
                 labels = targets[targets[:, 0] == si, 1:]
                 nl = len(labels)
                 tcls = labels[:, 0].tolist() if nl else []  # target class

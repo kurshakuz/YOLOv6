@@ -21,8 +21,10 @@ from yolov6.data.data_load import create_dataloader
 from yolov6.models.yolo import build_model
 from yolov6.models.yolo_lite import build_model as build_lite_model
 
-from yolov6.models.losses.loss import ComputeLoss as ComputeLoss
-from yolov6.models.losses.loss_fuseab import ComputeLoss as ComputeLoss_ab
+from yolov6.models.losses.loss_lp import ComputeLoss as ComputeLossLP
+from yolov6.models.losses.loss_det import ComputeLoss as ComputeLossDet
+from yolov6.models.losses.loss_fuseab import ComputeLoss as ComputeLoss_ab_lp
+from yolov6.models.losses.loss_fuseab_det import ComputeLoss as ComputeLoss_ab_det
 from yolov6.models.losses.loss_distill import ComputeLoss as ComputeLoss_distill
 from yolov6.models.losses.loss_distill_ns import ComputeLoss as ComputeLoss_distill_ns
 
@@ -142,21 +144,34 @@ class Trainer:
 
         # forward
         with torch.amp.autocast("cuda", enabled=self.device != 'cpu'):
-            preds, s_featmaps = self.model(images)
+            (preds_lp, preds_det), s_featmaps = self.model(images)
             if self.args.distill:
-                with torch.no_grad():
-                    t_preds, t_featmaps = self.teacher_model(images)
-                temperature = self.args.temperature   
-                total_loss, loss_items = self.compute_loss_distill(preds, t_preds, s_featmaps, t_featmaps, targets, \
-                                                                epoch_num, self.max_epoch, temperature, step_num)
-            
+                # with torch.no_grad():
+                #     t_preds, t_featmaps = self.teacher_model(images)
+                # temperature = self.args.temperature   
+                # total_loss, loss_items = self.compute_loss_distill(preds, t_preds, s_featmaps, t_featmaps, targets, \
+                #                                                 epoch_num, self.max_epoch, temperature, step_num)
+                assert False, 'ERROR in: Distill mode not support now.\n'
+
             elif self.args.fuse_ab:       
-                total_loss, loss_items = self.compute_loss((preds[0],preds[3],preds[4]), targets, epoch_num, step_num) # YOLOv6_af
-                total_loss_ab, loss_items_ab = self.compute_loss_ab(preds[:3], targets, epoch_num, step_num) # YOLOv6_ab
-                total_loss += total_loss_ab
-                loss_items += loss_items_ab
+                total_loss, loss_items = 0, 0
+                total_loss_lp, loss_items_lp = self.compute_loss_lp((preds_lp[0],preds_lp[3],preds_lp[4]), targets, epoch_num, step_num) # YOLOv6_af
+                total_loss_det, loss_items_det = self.compute_loss_det((preds_det[0],preds_det[3],preds_det[4]), targets, epoch_num, step_num) # YOLOv6_af                
+                total_loss += total_loss_lp + total_loss_det
+                loss_items += loss_items_lp + loss_items_det
+
+                total_loss_ab_lp, loss_items_ab_lp = self.compute_loss_ab_lp(preds_lp[:3], targets, epoch_num, step_num) # YOLOv6_ab
+                total_loss_ab_det, loss_items_ab_det = self.compute_loss_ab_det(preds_det[:3], targets, epoch_num, step_num) # YOLOv6_ab
+                total_loss += total_loss_ab_lp + total_loss_ab_det
+                loss_items += loss_items_ab_lp + loss_items_ab_det
+
             else:
-                total_loss, loss_items = self.compute_loss(preds, targets, epoch_num, step_num) # YOLOv6_af
+                total_loss, loss_items = 0, 0
+                total_loss_lp, loss_items_lp = self.compute_loss_lp(preds_lp, targets, epoch_num, step_num) # YOLOv6_af
+                total_loss_det, loss_items_det = self.compute_loss_det(preds_det, targets, epoch_num, step_num) # YOLOv6_af                
+                total_loss += total_loss_lp + total_loss_det
+                loss_items += loss_items_lp + loss_items_det
+
             if self.rank != -1:
                 total_loss *= self.world_size
         # backward
@@ -261,23 +276,40 @@ class Trainer:
         self.best_ap, self.ap = 0.0, 0.0
         self.best_stop_strong_aug_ap = 0.0
         self.evaluate_results = (0, 0) # AP50, AP50_95
-        
-        self.compute_loss = ComputeLoss(num_classes=self.data_dict['nc'],
+
+        self.compute_loss_lp = ComputeLossLP(num_classes=self.data_dict['nc'],
                                         ori_img_size=self.img_size,
-                                        warmup_epoch=self.cfg.model.head.atss_warmup_epoch,
-                                        use_dfl=self.cfg.model.head.use_dfl,
-                                        reg_max=self.cfg.model.head.reg_max,
-                                        iou_type=self.cfg.model.head.iou_type,
-										fpn_strides=self.cfg.model.head.strides)
+                                        warmup_epoch=self.cfg.model.head_lp.atss_warmup_epoch,
+                                        use_dfl=self.cfg.model.head_lp.use_dfl,
+                                        reg_max=self.cfg.model.head_lp.reg_max,
+                                        iou_type=self.cfg.model.head_lp.iou_type,
+										fpn_strides=self.cfg.model.head_lp.strides)
+
+        self.compute_loss_det = ComputeLossDet(num_classes=self.data_dict['nc'],
+                                        ori_img_size=self.img_size,
+                                        warmup_epoch=self.cfg.model.head_det.atss_warmup_epoch,
+                                        use_dfl=self.cfg.model.head_det.use_dfl,
+                                        reg_max=self.cfg.model.head_det.reg_max,
+                                        iou_type=self.cfg.model.head_det.iou_type,
+										fpn_strides=self.cfg.model.head_det.strides)
 
         if self.args.fuse_ab:
-            self.compute_loss_ab = ComputeLoss_ab(num_classes=self.data_dict['nc'],
+            self.compute_loss_ab_lp = ComputeLoss_ab_lp(num_classes=self.data_dict['nc'],
                                         ori_img_size=self.img_size,
                                         warmup_epoch=0,
                                         use_dfl=False,
                                         reg_max=0,
-                                        iou_type=self.cfg.model.head.iou_type,
-                                        fpn_strides=self.cfg.model.head.strides)
+                                        iou_type=self.cfg.model.head_lp.iou_type,
+                                        fpn_strides=self.cfg.model.head_lp.strides)
+
+            self.compute_loss_ab_det = ComputeLoss_ab_det(num_classes=self.data_dict['nc'],
+                                        ori_img_size=self.img_size,
+                                        warmup_epoch=0,
+                                        use_dfl=False,
+                                        reg_max=0,
+                                        iou_type=self.cfg.model.head_det.iou_type,
+                                        fpn_strides=self.cfg.model.head_det.strides)
+
         if self.args.distill :
             if self.cfg.model.type in ['YOLOv6n','YOLOv6s']:
                 Loss_distill_func = ComputeLoss_distill_ns
@@ -357,7 +389,7 @@ class Trainer:
         nc = int(data_dict['nc'])
         class_names = data_dict['names']
         assert len(class_names) == nc, f'the length of class names does not match the number of classes defined'
-        grid_size = max(int(max(cfg.model.head.strides)), 32)
+        grid_size = max(int(max(cfg.model.head_lp.strides)), 32)
         # create train dataloader
         train_loader = create_dataloader(train_path, args.img_size, args.batch_size // args.world_size, grid_size,
                                          hyp=dict(cfg.data_aug), augment=True, rect=False, rank=args.local_rank,
