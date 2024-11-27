@@ -1,2 +1,3 @@
 from .atss_assigner import ATSSAssigner
-from .tal_assigner import TaskAlignedAssigner
+from .tal_assigner_lp import TaskAlignedAssignerLP
+from .tal_assigner_det import TaskAlignedAssignerDet
