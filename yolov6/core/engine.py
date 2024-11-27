@@ -137,6 +137,11 @@ class Trainer:
     # Training loop for batchdata
     def train_in_steps(self, epoch_num, step_num):
         images, targets = self.prepro_data(self.batch_data, self.device)
+        
+        # Split targets based on class
+        targets_lp = targets[targets[:, 1] == 0]  # Class 0 targets for headLP
+        targets_det = targets[targets[:, 1] != 0]  # Other classes for headDet
+        
         # plot train_batch and save to tensorboard once an epoch
         if self.write_trainbatch_tb and self.main_process and self.step == 0:
             self.plot_train_batch(images, targets)
@@ -155,8 +160,9 @@ class Trainer:
 
             elif self.args.fuse_ab:       
                 total_loss, loss_items = 0, 0
-                total_loss_lp, loss_items_lp = self.compute_loss_lp((preds_lp[0],preds_lp[3],preds_lp[4]), targets, epoch_num, step_num) # YOLOv6_af
-                total_loss_det, loss_items_det = self.compute_loss_det((preds_det[0],preds_det[3],preds_det[4]), targets, epoch_num, step_num) # YOLOv6_af                
+                total_loss_lp, loss_items_lp = self.compute_loss_lp((preds_lp[0],preds_lp[3],preds_lp[4]), targets_lp, epoch_num, step_num)
+                total_loss_det, loss_items_det = self.compute_loss_det((preds_det[0],preds_det[3],preds_det[4]), targets_det, epoch_num, step_num)
+
                 total_loss += total_loss_lp + total_loss_det
                 loss_items += loss_items_lp + loss_items_det
 
@@ -167,8 +173,12 @@ class Trainer:
 
             else:
                 total_loss, loss_items = 0, 0
-                total_loss_lp, loss_items_lp = self.compute_loss_lp(preds_lp, targets, epoch_num, step_num) # YOLOv6_af
-                total_loss_det, loss_items_det = self.compute_loss_det(preds_det, targets, epoch_num, step_num) # YOLOv6_af                
+                targets_det = targets_det[:, :6]
+                # TODO: Recast predictions to match targets on inference
+                targets_det[:, 1] -= 1
+
+                total_loss_lp, loss_items_lp = self.compute_loss_lp(preds_lp, targets_lp, epoch_num, step_num)
+                total_loss_det, loss_items_det = self.compute_loss_det(preds_det, targets_det, epoch_num, step_num)
                 total_loss += total_loss_lp + total_loss_det
                 loss_items += loss_items_lp + loss_items_det
 
@@ -277,7 +287,8 @@ class Trainer:
         self.best_stop_strong_aug_ap = 0.0
         self.evaluate_results = (0, 0) # AP50, AP50_95
 
-        self.compute_loss_lp = ComputeLossLP(num_classes=self.data_dict['nc'],
+        self.compute_loss_lp = ComputeLossLP(
+                                        num_classes=1,
                                         ori_img_size=self.img_size,
                                         warmup_epoch=self.cfg.model.head_lp.atss_warmup_epoch,
                                         use_dfl=self.cfg.model.head_lp.use_dfl,
@@ -285,7 +296,8 @@ class Trainer:
                                         iou_type=self.cfg.model.head_lp.iou_type,
 										fpn_strides=self.cfg.model.head_lp.strides)
 
-        self.compute_loss_det = ComputeLossDet(num_classes=self.data_dict['nc'],
+        self.compute_loss_det = ComputeLossDet(
+                                        num_classes=self.data_dict['nc']-1,
                                         ori_img_size=self.img_size,
                                         warmup_epoch=self.cfg.model.head_det.atss_warmup_epoch,
                                         use_dfl=self.cfg.model.head_det.use_dfl,

@@ -9,7 +9,7 @@ from yolov6.assigners.anchor_generator import generate_anchors
 from yolov6.utils.general import dist2bbox, bbox2dist, xywh2xyxy, box_iou
 from yolov6.utils.figure_iou import IOUloss
 from yolov6.assigners.atss_assigner import ATSSAssigner
-from yolov6.assigners.tal_assigner import TaskAlignedAssigner
+from yolov6.assigners.tal_assigner_det import TaskAlignedAssignerDet
 
 class ComputeLoss:
     '''Loss computation func.'''
@@ -26,12 +26,10 @@ class ComputeLoss:
                  loss_weight={
                      'class': 1.0,
                      'iou': 2.5,
-                     'dfl': 0.5},
+                     'dfl': 0.5}
                  ):
 
         self.fpn_strides = fpn_strides
-        self.cached_feat_sizes = [torch.Size([0, 0]) for _ in fpn_strides]
-        self.cached_anchors = None
         self.grid_cell_size = grid_cell_size
         self.grid_cell_offset = grid_cell_offset
         self.num_classes = num_classes
@@ -39,7 +37,7 @@ class ComputeLoss:
 
         self.warmup_epoch = warmup_epoch
         self.warmup_assigner = ATSSAssigner(9, num_classes=self.num_classes)
-        self.formal_assigner = TaskAlignedAssigner(topk=13, num_classes=self.num_classes, alpha=1.0, beta=6.0)
+        self.formal_assigner = TaskAlignedAssignerDet(topk=13, num_classes=self.num_classes, alpha=1.0, beta=6.0)
 
         self.use_dfl = use_dfl
         self.reg_max = reg_max
@@ -54,30 +52,22 @@ class ComputeLoss:
         outputs,
         targets,
         epoch_num,
-        step_num,
-        batch_height,
-        batch_width
+        step_num
     ):
 
         feats, pred_scores, pred_distri = outputs
-        if all(feat.shape[2:] == cfsize for feat, cfsize in zip(feats, self.cached_feat_sizes)):
-            anchors, anchor_points, n_anchors_list, stride_tensor = self.cached_anchors
-        else:
-            self.cached_feat_sizes = [feat.shape[2:] for feat in feats]
-            anchors, anchor_points, n_anchors_list, stride_tensor = \
-                   generate_anchors(feats, self.fpn_strides, self.grid_cell_size, self.grid_cell_offset, device=feats[0].device)
-            self.cached_anchors = anchors, anchor_points, n_anchors_list, stride_tensor
+        anchors, anchor_points, n_anchors_list, stride_tensor = \
+               generate_anchors(feats, self.fpn_strides, self.grid_cell_size, self.grid_cell_offset, device=feats[0].device)
 
         assert pred_scores.type() == pred_distri.type()
-        gt_bboxes_scale = torch.tensor([batch_width, batch_height, batch_width, batch_height]).type_as(pred_scores)
+        gt_bboxes_scale = torch.full((1,4), self.ori_img_size).type_as(pred_scores)
         batch_size = pred_scores.shape[0]
 
         # targets
         targets =self.preprocess(targets, batch_size, gt_bboxes_scale)
         gt_labels = targets[:, :, :1]
         gt_bboxes = targets[:, :, 1:] #xyxy
-        mask_gt = (gt_bboxes.sum(-1, keepdim=True) > 0).float()
-
+        mask_gt = (gt_bboxes.sum(-1, keepdim=True) > 0).float()        
         # pboxes
         anchor_points_s = anchor_points / stride_tensor
         pred_bboxes = self.bbox_decode(anchor_points_s, pred_distri) #xyxy
@@ -164,9 +154,9 @@ class ComputeLoss:
 
         target_scores_sum = target_scores.sum()
 		# avoid devide zero error, devide by zero will cause loss to be inf or nan.
-        # if target_scores_sum is 0, loss_cls equals to 0 alson
-        if target_scores_sum > 1:
-            loss_cls /= target_scores_sum
+        # if target_scores_sum is 0, loss_cls equals to 0 alson 
+        if target_scores_sum > 0:
+        	loss_cls /= target_scores_sum
 
         # bbox loss
         loss_iou, loss_dfl = self.bbox_loss(pred_distri, pred_bboxes, anchor_points_s, target_bboxes,
@@ -235,10 +225,10 @@ class BboxLoss(nn.Module):
                 target_scores.sum(-1), fg_mask).unsqueeze(-1)
             loss_iou = self.iou_loss(pred_bboxes_pos,
                                      target_bboxes_pos) * bbox_weight
-            if target_scores_sum > 1:
-                loss_iou = loss_iou.sum() / target_scores_sum
-            else:
+            if target_scores_sum == 0:
                 loss_iou = loss_iou.sum()
+            else:
+                loss_iou = loss_iou.sum() / target_scores_sum
 
             # dfl loss
             if self.use_dfl:
@@ -251,10 +241,10 @@ class BboxLoss(nn.Module):
                     target_ltrb, bbox_mask).reshape([-1, 4])
                 loss_dfl = self._df_loss(pred_dist_pos,
                                         target_ltrb_pos) * bbox_weight
-                if target_scores_sum > 1:
-                    loss_dfl = loss_dfl.sum() / target_scores_sum
-                else:
+                if target_scores_sum == 0:
                     loss_dfl = loss_dfl.sum()
+                else:
+                    loss_dfl = loss_dfl.sum() / target_scores_sum
             else:
                 loss_dfl = pred_dist.sum() * 0.
 

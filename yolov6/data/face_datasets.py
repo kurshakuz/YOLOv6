@@ -138,23 +138,24 @@ class TrainValDataset(Dataset):
                 boxes[:, 3] = (
                     h * (labels[:, 2] + labels[:, 4] / 2) + pad[1]
                 )  # bottom right y
-                
-                boxes[:, 4] = np.array(labels[:, 5] > 0, dtype=np.int32) * (w * labels[:, 5] + pad[0]) + (
-                    np.array(labels[:, 5] > 0, dtype=np.int32) - 1)
-                boxes[:, 5] = np.array(labels[:, 6] > 0, dtype=np.int32) * (h * labels[:, 6] + pad[1]) + (
-                    np.array(labels[:, 6] > 0, dtype=np.int32) - 1)
-                boxes[:, 6] = np.array(labels[:, 7] > 0, dtype=np.int32) * (w * labels[:, 7] + pad[0]) + (
-                    np.array(labels[:, 7] > 0, dtype=np.int32) - 1)
-                boxes[:, 7] = np.array(labels[:, 8] > 0, dtype=np.int32) * (h * labels[:, 8] + pad[1]) + (
-                    np.array(labels[:, 8] > 0, dtype=np.int32) - 1)
-                boxes[:, 8] = np.array(labels[:, 5] > 0, dtype=np.int32) * (w * labels[:, 9] + pad[0]) + (
-                    np.array(labels[:, 9] > 0, dtype=np.int32) - 1)
-                boxes[:, 9] = np.array(labels[:, 5] > 0, dtype=np.int32) * (h * labels[:, 10] + pad[1]) + (
-                    np.array(labels[:, 10] > 0, dtype=np.int32) - 1)
-                boxes[:, 10] = np.array(labels[:, 11] > 0, dtype=np.int32) * (w * labels[:, 11] + pad[0]) + (
-                    np.array(labels[:, 11] > 0, dtype=np.int32) - 1)
-                boxes[:, 11] = np.array(labels[:, 12] > 0, dtype=np.int32) * (h * labels[:, 12] + pad[1]) + (
-                    np.array(labels[:, 12] > 0, dtype=np.int32) - 1)
+
+                if labels.shape[1] > 5:
+                    boxes[:, 4] = np.array(labels[:, 5] > 0, dtype=np.int32) * (w * labels[:, 5] + pad[0]) + (
+                        np.array(labels[:, 5] > 0, dtype=np.int32) - 1)
+                    boxes[:, 5] = np.array(labels[:, 6] > 0, dtype=np.int32) * (h * labels[:, 6] + pad[1]) + (
+                        np.array(labels[:, 6] > 0, dtype=np.int32) - 1)
+                    boxes[:, 6] = np.array(labels[:, 7] > 0, dtype=np.int32) * (w * labels[:, 7] + pad[0]) + (
+                        np.array(labels[:, 7] > 0, dtype=np.int32) - 1)
+                    boxes[:, 7] = np.array(labels[:, 8] > 0, dtype=np.int32) * (h * labels[:, 8] + pad[1]) + (
+                        np.array(labels[:, 8] > 0, dtype=np.int32) - 1)
+                    boxes[:, 8] = np.array(labels[:, 5] > 0, dtype=np.int32) * (w * labels[:, 9] + pad[0]) + (
+                        np.array(labels[:, 9] > 0, dtype=np.int32) - 1)
+                    boxes[:, 9] = np.array(labels[:, 5] > 0, dtype=np.int32) * (h * labels[:, 10] + pad[1]) + (
+                        np.array(labels[:, 10] > 0, dtype=np.int32) - 1)
+                    boxes[:, 10] = np.array(labels[:, 11] > 0, dtype=np.int32) * (w * labels[:, 11] + pad[0]) + (
+                        np.array(labels[:, 11] > 0, dtype=np.int32) - 1)
+                    boxes[:, 11] = np.array(labels[:, 12] > 0, dtype=np.int32) * (h * labels[:, 12] + pad[1]) + (
+                        np.array(labels[:, 12] > 0, dtype=np.int32) - 1)
 
                 labels[:, 1:] = boxes
 
@@ -182,12 +183,13 @@ class TrainValDataset(Dataset):
             boxes[:, 3] = (labels[:, 4] - labels[:, 2]) / h  # height
             labels[:, 1:] = boxes
 
-            labels[:, [5, 7, 9, 11]] /= w  # normalized landmark x 0-1
-            labels[:, [5, 7, 9, 11]] = np.where(labels[:, [5, 7, 9, 11]] < 0, -1, labels[:, [5, 7, 9, 11]])
-            labels[:, [6, 8, 10, 12]] /= h  # normalized landmark y 0-1
-            labels[:, [6, 8, 10, 12]] = np.where(labels[:, [6, 8, 10, 12]] < 0, -1, labels[:, [6, 8, 10, 12]])
+            if labels.shape[1] > 5:
+                labels[:, [5, 7, 9, 11]] /= w  # normalized landmark x 0-1
+                labels[:, [5, 7, 9, 11]] = np.where(labels[:, [5, 7, 9, 11]] < 0, -1, labels[:, [5, 7, 9, 11]])
+                labels[:, [6, 8, 10, 12]] /= h  # normalized landmark y 0-1
+                labels[:, [6, 8, 10, 12]] = np.where(labels[:, [6, 8, 10, 12]] < 0, -1, labels[:, [6, 8, 10, 12]])
 
-        self.showlabels(img,labels[:,1:5],labels[:,5:13])
+        self.showlabels(img, labels[:,1:5], labels[:,5:13] if labels.shape[1] > 5 else None)
         if self.augment:
             img, labels = self.general_augment(img, labels.copy())
 
@@ -195,27 +197,25 @@ class TrainValDataset(Dataset):
         if len(labels):
             labels_out[:, 1:] = torch.from_numpy(labels)
 
-        
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img = np.ascontiguousarray(img)
-        #return torch.from_numpy(img), labels_out[:5], self.img_paths[index], shapes, labels_out[5:]
+
         return torch.from_numpy(img), labels_out, self.img_paths[index], shapes
 
-    def showlabels(self, img, boxs, landmarks):
+    def showlabels(self, img, boxes, landmarks=None):
         b, g, r = cv2.split(img)
-        #print(boxs)
         new_image1 = cv2.merge([b, g, r])
-        for box in boxs:
-            x,y,w,h = box[0] * img.shape[1], box[1] * img.shape[0], box[2] * img.shape[1], box[3] * img.shape[0]
-            # cv2.rectangle(new_image1, (int(x), int(y)), (int(w), int(h)), (0,255,0), 2)
-            
-            cv2.rectangle(new_image1, (int(x - w/2), int(y - h/2)), (int(x + w/2), int(y + h/2)), (0, 255, 0), 2)
+        for box in boxes:
+            x, y, w, h = box
+            cv2.rectangle(new_image1, (int((x - w/2) * img.shape[1]), int((y - h/2) * img.shape[0])), 
+                          (int((x + w/2) * img.shape[1]), int((y + h/2) * img.shape[0])), (0, 255, 0), 2)
 
-        for landmark in landmarks:
-            #cv2.circle(img,(60,60),30,(0,0,255))
-            for i in range(4):
-                cv2.circle(new_image1, (int(landmark[2*i] * img.shape[1]), int(landmark[2*i+1]*img.shape[0])), 3 ,(0,0,255), -1)
+        if landmarks is not None:
+            for landmark in landmarks:
+                for i in range(0, len(landmark), 2):
+                    if landmark[i] >=0 and landmark[i+1] >=0:
+                        cv2.circle(new_image1, (int(landmark[i] * img.shape[1]), int(landmark[i+1]*img.shape[0])),  3, (0, 0, 255), -1)
         cv2.imwrite('1.jpg', new_image1)
         cv2.waitKey(0)
 
@@ -402,19 +402,16 @@ class TrainValDataset(Dataset):
                     img_info, self.class_names, save_path
                 )
 
-        img_paths, labels = list(
-            zip(
-                *[
-                    (
-                        img_path,
-                        np.array(info["labels"], dtype=np.float32)
-                        if info["labels"]
-                        else np.zeros((0, 13), dtype=np.float32),
-                    )
-                    for img_path, info in img_info.items()
-                ]
-            )
-        )
+        img_paths = []
+        labels = []
+        for img_path, info in img_info.items():
+            if info["labels"]:
+                label_array = np.array(info["labels"], dtype=np.float32)
+            else:
+                label_array = np.zeros((0, 13), dtype=np.float32)
+            img_paths.append(img_path)
+            labels.append(label_array)
+        img_paths, labels = zip(*[(path, label) for path, label in zip(img_paths, labels)])
         self.img_info = img_info
         LOGGER.info(
             f"{self.task}: Final numbers of valid images: {len(img_paths)}/ labels: {len(labels)}. "
@@ -458,11 +455,11 @@ class TrainValDataset(Dataset):
             if nl:
                 labels[:, 2] = 1 - labels[:, 2]
 
+                # TODO: Handle cases when class is not lp
                 labels[:, 6] = np.where(labels[:,6] < 0, -1, 1 - labels[:, 6])
                 labels[:, 8] = np.where(labels[:, 8] < 0, -1, 1 - labels[:, 8])
                 labels[:, 10] = np.where(labels[:, 10] < 0, -1, 1 - labels[:, 10])
                 labels[:, 12] = np.where(labels[:, 12] < 0, -1, 1 - labels[:, 12])
-
 
         # Flip left-right
         if random.random() < self.hyp["fliplr"]:
@@ -561,20 +558,35 @@ class TrainValDataset(Dataset):
                     labels = [
                         x.split() for x in f.read().strip().splitlines() if len(x)
                     ]
-                    labels = np.array(labels, dtype=np.float32)
-                if len(labels):
-                    assert all(
-                        len(l) == 13 for l in labels
-                    ), f"{lb_path}: wrong label format."
+                    padded_labels = []
+                    for label in labels:
+                        if len(label) == 5:
+                            # Class 0 has 13 elements, pad others with -1
+                            padded_label = label + ['-1'] * 8
+                        elif len(label) == 13:
+                            padded_label = label
+                        else:
+                            nc += 1
+                            msg += f"WARNING: {lb_path}: Incorrect label length {len(label)}."
+                            continue  # Skip invalid labels
+                        padded_labels.append(padded_label)
+
+                if padded_labels:
+                    labels = np.array(padded_labels, dtype=np.float32)
+                    assert all(len(l) == 13 for l in labels), f"{lb_path}: Not all labels have 13 elements."
                     assert (
-                        labels[:, : 5] >= 0
-                    ).all(), f"{lb_path}: Label values error: all values in label file must > 0"
-                    assert (
-                        labels[:, 1:5] <= 1
-                    ).all(), f"{lb_path}: Label values error: all coordinates must be normalized"
+                        labels[:, :5] >= 0
+                    ).all(), f"{lb_path}: Label values error: all values in bounding boxes must > 0"
+                    if labels.shape[1] > 5:
+                        assert (
+                            labels[:, 1:5] <= 1
+                        ).all(), f"{lb_path}: Bounding box coordinates must be normalized"
+                        assert (
+                            labels[:, 5:13] <= 1
+                        ).all(), f"{lb_path}: Landmark coordinates must be normalized"
 
                     _, indices = np.unique(labels, axis=0, return_index=True)
-                    if len(indices) < len(labels):  # duplicate row check
+                    if len(indices) < len(labels):
                         labels = labels[indices]  # remove duplicates
                         msg += f"WARNING: {lb_path}: {len(labels) - len(indices)} duplicate labels removed"
                     labels = labels.tolist()
@@ -643,7 +655,7 @@ class TrainValDataset(Dataset):
         with open(save_path, "w") as f:
             json.dump(dataset, f)
             LOGGER.info(
-                f"Convert to COCO format finished. Resutls saved in {save_path}"
+                f"Convert to COCO format finished. Results saved in {save_path}"
             )
 
     @staticmethod

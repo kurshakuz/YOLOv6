@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from yolov6.assigners.anchor_generator import generate_anchors
 from yolov6.utils.general import dist2bbox, bbox2dist, xywh2xyxy, box_iou
 from yolov6.utils.figure_iou import IOUloss
-from yolov6.assigners.tal_assigner import TaskAlignedAssigner
+from yolov6.assigners.tal_assigner_lp import TaskAlignedAssignerLP
 from yolov6.utils.RepulsionLoss import repulsion_loss
 
 class ComputeLoss:
@@ -39,7 +39,7 @@ class ComputeLoss:
         self.ori_img_size = ori_img_size
         
         self.warmup_epoch = warmup_epoch
-        self.formal_assigner = TaskAlignedAssigner(topk=13, num_classes=self.num_classes, alpha=1.0, beta=6.0)
+        self.formal_assigner = TaskAlignedAssignerLP(topk=13, num_classes=self.num_classes, alpha=1.0, beta=6.0)
 
         self.use_dfl = use_dfl
         self.reg_max = reg_max
@@ -170,6 +170,13 @@ class ComputeLoss:
         for i, item in enumerate(targets.cpu().numpy().tolist()):
             targets_list[int(item[0])].append(item[1:])
         max_len = max((len(l) for l in targets_list))
+
+        # test = list(map(lambda l:l + [[-1,0,0,0,0]], targets_list))
+        # print("targets_list_lp", len(targets_list), len(targets_list[0]), len(targets_list[1]))
+        # print("test_lp",              len(test),          len(test[0]),        len(test[1]))
+        # test2 = list(map(lambda l:l + [[-1,0,0,0,0,-1,-1,-1,-1,-1,-1,-1,-1]]*(max_len - len(l)), targets_list))
+        # print("test2_lp", test2)
+
         targets = torch.from_numpy(np.array(list(map(lambda l:l + [[-1,0,0,0,0,-1,-1,-1,-1,-1,-1,-1,-1]]*(max_len - len(l)), targets_list)))[:,1:,:]).to(targets.device)
         
         batch_target = targets[:, :, 1:5].mul_(scale_tensor)
@@ -195,15 +202,11 @@ class VarifocalLoss(nn.Module):
     def __init__(self):
         super(VarifocalLoss, self).__init__()
 
-    def forward(self, pred_score,gt_score, label, alpha=0.75, gamma=2.0):
+    def forward(self, pred_score, gt_score, label, alpha=0.75, gamma=2.0):
 
         weight = alpha * pred_score.pow(gamma) * (1 - label) + gt_score * label
-        print("pred_score", pred_score.shape)
-        print("gt_score", gt_score.shape)
-        gt_score_crop = gt_score[..., :-1]
-        print("gt_score_crop", gt_score_crop.shape)
         with torch.amp.autocast("cuda", enabled=False):
-            loss = (F.binary_cross_entropy(pred_score.float(), gt_score_crop.float(), reduction='none') * weight).sum()
+            loss = (F.binary_cross_entropy(pred_score.float(), gt_score.float(), reduction='none') * weight).sum()
 
         return loss
 

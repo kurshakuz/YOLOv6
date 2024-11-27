@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from yolov6.assigners.anchor_generator import generate_anchors
 from yolov6.utils.general import dist2bbox, bbox2dist, xywh2xyxy, box_iou
 from yolov6.utils.figure_iou import IOUloss
-from yolov6.assigners.tal_assigner import TaskAlignedAssigner
+from yolov6.assigners.tal_assigner_det import TaskAlignedAssignerDet
 
 
 class ComputeLoss:
@@ -36,7 +36,7 @@ class ComputeLoss:
         self.ori_img_size = ori_img_size
 
         self.warmup_epoch = warmup_epoch
-        self.formal_assigner = TaskAlignedAssigner(topk=26, num_classes=self.num_classes, alpha=1.0, beta=6.0)
+        self.formal_assigner = TaskAlignedAssignerDet(topk=26, num_classes=self.num_classes, alpha=1.0, beta=6.0)
 
         self.use_dfl = use_dfl
         self.reg_max = reg_max

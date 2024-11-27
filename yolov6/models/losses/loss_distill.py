@@ -9,7 +9,7 @@ from yolov6.assigners.anchor_generator import generate_anchors
 from yolov6.utils.general import dist2bbox, bbox2dist, xywh2xyxy
 from yolov6.utils.figure_iou import IOUloss
 from yolov6.assigners.atss_assigner import ATSSAssigner
-from yolov6.assigners.tal_assigner import TaskAlignedAssigner
+from yolov6.assigners.tal_assigner_lp import TaskAlignedAssignerLP
 from yolov6.utils.RepulsionLoss import repulsion_loss
 
 class ComputeLoss:
@@ -46,7 +46,7 @@ class ComputeLoss:
 
         self.warmup_epoch = warmup_epoch
         self.warmup_assigner = ATSSAssigner(9, num_classes=self.num_classes)
-        self.formal_assigner = TaskAlignedAssigner(topk=13, num_classes=self.num_classes, alpha=1.0, beta=6.0)
+        self.formal_assigner = TaskAlignedAssignerLP(topk=13, num_classes=self.num_classes, alpha=1.0, beta=6.0)
 
         self.use_dfl = use_dfl
         self.reg_max = reg_max

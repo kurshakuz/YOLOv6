@@ -25,7 +25,7 @@ def get_args_parser(add_help=True):
     parser = argparse.ArgumentParser(description='YOLOv6-face PyTorch Training', add_help=add_help)
     parser.add_argument('--data-path', default='./data/WIDER_FACE.yaml', type=str, help='path of dataset')
     parser.add_argument('--conf-file', default='./configs/yolov6s_finetune.py', type=str, help='experiments description file')
-    parser.add_argument('--img-size', default=800, type=int, help='train, val image size (pixels)')
+    parser.add_argument('--img-size', default=640, type=int, help='train, val image size (pixels)')
     parser.add_argument('--batch-size', default=8, type=int, help='total batch size for all GPUs')
     parser.add_argument('--epochs', default=300, type=int, help='number of total epochs to run')
     parser.add_argument('--workers', default=8, type=int, help='number of data loading workers (default: 8)')
