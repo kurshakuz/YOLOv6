@@ -172,21 +172,21 @@ class Trainer:
                 loss_items += loss_items_ab_lp + loss_items_ab_det
 
             else:
-                total_loss, loss_items = 0, 0
                 targets_det = targets_det[:, :6]
                 # TODO: Recast predictions to match targets on inference
                 targets_det[:, 1] -= 1
 
                 total_loss_lp, loss_items_lp = self.compute_loss_lp(preds_lp, targets_lp, epoch_num, step_num)
                 total_loss_det, loss_items_det = self.compute_loss_det(preds_det, targets_det, epoch_num, step_num)
-                total_loss += total_loss_lp + total_loss_det
-                loss_items += loss_items_lp + loss_items_det
+
+                total_loss = total_loss_lp + total_loss_det
 
             if self.rank != -1:
                 total_loss *= self.world_size
         # backward
         self.scaler.scale(total_loss).backward()
-        self.loss_items = loss_items
+        self.loss_items_lp = loss_items_lp
+        self.loss_items_det = loss_items_det
         self.update_optimizer()
 
     def eval_and_save(self):
@@ -361,7 +361,8 @@ class Trainer:
     # Print loss after each steps
     def print_details(self):
         if self.main_process:
-            self.mean_loss = (self.mean_loss * self.step + self.loss_items) / (self.step + 1)
+            # TODO: Add more loss items
+            self.mean_loss = (self.mean_loss * self.step + self.loss_items_lp) / (self.step + 1)
             self.pbar.set_description(('%10s' + '%10.4g' * self.loss_num) % (f'{self.epoch}/{self.max_epoch - 1}', \
                                                                 *(self.mean_loss)))
 
