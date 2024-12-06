@@ -69,7 +69,8 @@ class Evaler:
             if not os.path.exists(weights):
                 download_ckpt(weights)
             model = load_checkpoint(weights, map_location=self.device)
-            self.stride = int(model.stride.max())
+            # self.stride = int(model.stride.max())
+            self.stride = 32
             if self.device.type != 'cpu':
                 model(torch.zeros(1, 3, self.img_size, self.img_size).to(self.device).type_as(next(model.parameters())))
             # switch to deploy
@@ -148,8 +149,8 @@ class Evaler:
                 eval_outputs_det = copy.deepcopy([x.detach().cpu() for x in outputs_det])
 
             # save result
-            pred_results.extend(self.convert_to_coco_format(outputs_lp, imgs, paths, shapes, self.ids))
-            pred_results.extend(self.convert_to_coco_format(outputs_det, imgs, paths, shapes, self.ids))
+            pred_results.extend(self.convert_to_coco_format(outputs_lp, imgs, paths, shapes, self.ids, is_lp_head=True))
+            pred_results.extend(self.convert_to_coco_format(outputs_det, imgs, paths, shapes, self.ids, is_lp_head=False))
 
             # for tensorboard visualization, maximum images to show: 8
             if i == 0:
@@ -375,7 +376,7 @@ class Evaler:
             coords[:, [1, 3]] = coords[:, [1, 3]].clip(0, img0_shape[0])  # y1, y2
         return coords
 
-    def convert_to_coco_format(self, outputs, imgs, paths, shapes, ids):
+    def convert_to_coco_format(self, outputs, imgs, paths, shapes, ids, is_lp_head=True):
         pred_results = []
         for i, pred in enumerate(outputs):
             if len(pred) == 0:
@@ -385,7 +386,10 @@ class Evaler:
             image_id = int(path.stem) if self.is_coco else path.stem
             bboxes = self.box_convert(pred[:, 0:4])
             bboxes[:, :2] -= bboxes[:, 2:] / 2
-            cls = pred[:, 5]
+            if is_lp_head:
+                cls = pred[:, 5]
+            else:
+                cls = pred[:, 5] + 1
             scores = pred[:, 4]
             for ind in range(pred.shape[0]):
                 category_id = ids[int(cls[ind])]

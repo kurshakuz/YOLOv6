@@ -189,7 +189,7 @@ class TrainValDataset(Dataset):
                 labels[:, [6, 8, 10, 12]] /= h  # normalized landmark y 0-1
                 labels[:, [6, 8, 10, 12]] = np.where(labels[:, [6, 8, 10, 12]] < 0, -1, labels[:, [6, 8, 10, 12]])
 
-        self.showlabels(img, labels[:,1:5], labels[:,5:13] if labels.shape[1] > 5 else None)
+        # self.showlabels(img, labels[:,1:5], labels[:,5:13] if labels.shape[1] > 5 else None)
         if self.augment:
             img, labels = self.general_augment(img, labels.copy())
 
@@ -216,7 +216,10 @@ class TrainValDataset(Dataset):
                 for i in range(0, len(landmark), 2):
                     if landmark[i] >=0 and landmark[i+1] >=0:
                         cv2.circle(new_image1, (int(landmark[i] * img.shape[1]), int(landmark[i+1]*img.shape[0])),  3, (0, 0, 255), -1)
-        cv2.imwrite('1.jpg', new_image1)
+        import os
+        count = len([name for name in os.listdir('images_aug') if os.path.isfile(os.path.join('images', name))])
+        cv2.imwrite(f'images_aug/{count}.jpg', new_image1)
+        # cv2.imwrite('images/1.jpg', new_image1)
         cv2.waitKey(0)
 
     def load_image(self, index, force_load_size=None):
@@ -455,7 +458,6 @@ class TrainValDataset(Dataset):
             if nl:
                 labels[:, 2] = 1 - labels[:, 2]
 
-                # TODO: Handle cases when class is not lp
                 labels[:, 6] = np.where(labels[:,6] < 0, -1, 1 - labels[:, 6])
                 labels[:, 8] = np.where(labels[:, 8] < 0, -1, 1 - labels[:, 8])
                 labels[:, 10] = np.where(labels[:, 10] < 0, -1, 1 - labels[:, 10])

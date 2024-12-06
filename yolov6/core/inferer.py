@@ -138,6 +138,9 @@ class Inferer:
             if len(det_det):
                 det_det[:, :4] = self.rescale_det(img.shape[2:], det_det[:, :4], img_src.shape).round()
                 for *xyxy, conf, cls in reversed(det_det):
+                    # due to the shift in predictions in training
+                    # we need to slightly adjust the predictions
+                    cls += 1
                     if save_txt:  # Write to file
                         xywh = (self.box_convert(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf)
