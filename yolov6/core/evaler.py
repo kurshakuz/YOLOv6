@@ -13,7 +13,7 @@ from pycocotools.cocoeval import COCOeval
 
 from yolov6.data.data_load import create_dataloader
 from yolov6.utils.events import LOGGER, NCOLS
-from yolov6.utils.nms import non_max_suppression_face, non_max_suppression
+from yolov6.utils.nms import non_max_suppression_lp_car, non_max_suppression
 from yolov6.utils.general import download_ckpt
 from yolov6.utils.checkpoint import load_checkpoint
 from yolov6.utils.torch_utils import time_sync, get_model_info
@@ -137,7 +137,7 @@ class Evaler:
 
             # post-process
             t3 = time_sync()
-            outputs_lp = non_max_suppression_face(outputs_lp, self.conf_thres, self.iou_thres, multi_label=True)
+            outputs_lp = non_max_suppression_lp_car(outputs_lp, self.conf_thres, self.iou_thres, multi_label=True)
             outputs_det = non_max_suppression(outputs_det, self.conf_thres, self.iou_thres, multi_label=True)
             self.speed_result[3] += time_sync() - t3  # post-process time
             self.speed_result[0] += len(outputs_lp)

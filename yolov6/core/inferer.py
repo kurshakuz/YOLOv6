@@ -17,7 +17,7 @@ from yolov6.utils.events import LOGGER, load_yaml
 from yolov6.layers.common import DetectBackend
 from yolov6.data.data_augment import letterbox
 from yolov6.data.datasets import LoadData
-from yolov6.utils.nms import non_max_suppression_face, non_max_suppression
+from yolov6.utils.nms import non_max_suppression_lp_car, non_max_suppression
 from yolov6.utils.torch_utils import get_model_info
 
 class Inferer:
@@ -77,7 +77,7 @@ class Inferer:
                 # expand for batch dim
             t1 = time.time()
             (pred_results_lp, pred_results_det) = self.model(img)
-            det_lp = non_max_suppression_face(pred_results_lp, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
+            det_lp = non_max_suppression_lp_car(pred_results_lp, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
             det_det = non_max_suppression(pred_results_det, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)[0]
             t2 = time.time()
 

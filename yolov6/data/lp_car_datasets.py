@@ -20,7 +20,7 @@ from PIL import ExifTags, Image, ImageOps
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from .data_augment_face import (
+from .data_augment_lp_car import (
     augment_hsv,
     letterbox,
     mixup,
