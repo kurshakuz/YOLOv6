@@ -173,7 +173,8 @@ class Trainer:
 
             else:
                 targets_det = targets_det[:, :6]
-                # TODO: Recast predictions to match targets on inference
+                # Temporarily casting classes for detector to start from 0, as it is expected by the loss function
+                # The class is later adapted during evaluation and inference.
                 targets_det[:, 1] -= 1
 
                 total_loss_lp, loss_items_lp = self.compute_loss_lp(preds_lp, targets_lp, epoch_num, step_num)

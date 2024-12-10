@@ -150,6 +150,10 @@ class ComputeLoss:
         # cls loss
         target_labels = torch.where(fg_mask > 0, target_labels, torch.full_like(target_labels, self.num_classes))
         one_hot_label = F.one_hot(target_labels.long(), self.num_classes + 1)[..., :-1]
+
+        # Clamp target_scores to [0, 1]
+        target_scores = torch.clamp(target_scores, 0.0, 1.0)
+
         loss_cls = self.varifocal_loss(pred_scores, target_scores, one_hot_label)
 
         target_scores_sum = target_scores.sum()
