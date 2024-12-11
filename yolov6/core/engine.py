@@ -23,7 +23,7 @@ from yolov6.models.yolo_lite import build_model as build_lite_model
 
 from yolov6.models.losses.loss_lp import ComputeLoss as ComputeLossLP
 from yolov6.models.losses.loss_det import ComputeLoss as ComputeLossDet
-from yolov6.models.losses.loss_fuseab import ComputeLoss as ComputeLoss_ab_lp
+from yolov6.models.losses.loss_fuseab_lp import ComputeLoss as ComputeLoss_ab_lp
 from yolov6.models.losses.loss_fuseab_det import ComputeLoss as ComputeLoss_ab_det
 from yolov6.models.losses.loss_distill import ComputeLoss as ComputeLoss_distill
 from yolov6.models.losses.loss_distill_ns import ComputeLoss as ComputeLoss_distill_ns
@@ -159,18 +159,23 @@ class Trainer:
                 assert False, 'ERROR in: Distill mode not support now.\n'
 
             elif self.args.fuse_ab:       
-                total_loss, loss_items = 0, 0
+                targets_det = targets_det[:, :6]
+                # Temporarily casting classes for detector to start from 0, as it is expected by the loss function
+                # The class is later adapted during evaluation and inference.
+                targets_det[:, 1] -= 1
+
                 total_loss_lp, loss_items_lp = self.compute_loss_lp((preds_lp[0],preds_lp[3],preds_lp[4]), targets_lp, epoch_num, step_num)
                 total_loss_det, loss_items_det = self.compute_loss_det((preds_det[0],preds_det[3],preds_det[4]), targets_det, epoch_num, step_num)
 
-                total_loss += total_loss_lp + total_loss_det
-                loss_items += loss_items_lp + loss_items_det
+                total_loss = total_loss_lp + total_loss_det
 
-                total_loss_ab_lp, loss_items_ab_lp = self.compute_loss_ab_lp(preds_lp[:3], targets, epoch_num, step_num) # YOLOv6_ab
-                total_loss_ab_det, loss_items_ab_det = self.compute_loss_ab_det(preds_det[:3], targets, epoch_num, step_num) # YOLOv6_ab
-                total_loss += total_loss_ab_lp + total_loss_ab_det
-                loss_items += loss_items_ab_lp + loss_items_ab_det
+                total_loss_ab_lp, loss_items_ab_lp = self.compute_loss_ab_lp(preds_lp[:3], targets_lp, epoch_num, step_num) # YOLOv6_ab
+                total_loss_ab_det, loss_items_ab_det = self.compute_loss_ab_det(preds_det[:3], targets_det, epoch_num, step_num) # YOLOv6_ab
 
+                total_loss += total_loss_ab_lp
+                total_loss += total_loss_ab_det
+                loss_items_lp += loss_items_ab_lp
+                loss_items_det += loss_items_ab_det
             else:
                 targets_det = targets_det[:, :6]
                 # Temporarily casting classes for detector to start from 0, as it is expected by the loss function
@@ -307,7 +312,8 @@ class Trainer:
 										fpn_strides=self.cfg.model.head_det.strides)
 
         if self.args.fuse_ab:
-            self.compute_loss_ab_lp = ComputeLoss_ab_lp(num_classes=self.data_dict['nc'],
+            self.compute_loss_ab_lp = ComputeLoss_ab_lp(
+                                        num_classes=1,
                                         ori_img_size=self.img_size,
                                         warmup_epoch=0,
                                         use_dfl=False,
@@ -315,7 +321,8 @@ class Trainer:
                                         iou_type=self.cfg.model.head_lp.iou_type,
                                         fpn_strides=self.cfg.model.head_lp.strides)
 
-            self.compute_loss_ab_det = ComputeLoss_ab_det(num_classes=self.data_dict['nc'],
+            self.compute_loss_ab_det = ComputeLoss_ab_det(
+                                        num_classes=self.data_dict['nc']-1,
                                         ori_img_size=self.img_size,
                                         warmup_epoch=0,
                                         use_dfl=False,

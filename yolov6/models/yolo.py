@@ -125,8 +125,8 @@ def build_network(config, channels, num_classes_all, num_layers_lp, num_layers_d
         assert False, 'Not implemented yet.'
 
     elif fuse_ab:
-        from yolov6.models.heads.effidehead_fuseab import Detect as DetectLP, DeHead as DeHeadLP, EffiDeHead as EffiDeHeadLP
-        from yolov6.models.heads.effidehead_fuseab import Detect as DetectDet, build_effidehead_layer
+        from yolov6.models.heads.effidehead_fuseab import Detect as DetectLP, DeHead, EffiDeHead
+        from yolov6.models.heads.effidehead_fuseab_det import Detect as DetectDet, build_effidehead_layer
 
         anchors_init_lp = config.model.head_lp.anchors_init
         HEAD_LP = eval(config.model.head_lp.type)
@@ -140,7 +140,6 @@ def build_network(config, channels, num_classes_all, num_layers_lp, num_layers_d
         return backbone, neck, head_lp, head_det
 
     else:
-        # from yolov6.models.effidehead import Detect as DetectLP, DeHead as DeHeadLP, EffiDeHead as EffiDeHeadLP
         from yolov6.models.effidehead import Detect as DetectLP, DeHead, EffiDeHead
         from yolov6.models.effidehead_det import Detect as DetectDet, build_effidehead_layer
         HEAD_LP = eval(config.model.head_lp.type)
